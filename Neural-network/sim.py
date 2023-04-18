@@ -90,6 +90,7 @@ for inputpattern in [noisy_0,noisy_2,noisy_2b]:
     plt.close()
     plt.matshow(inputpattern)
     plt.show()
+
 ###
 ### Random flipping
 ###
