@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 nx = 520
 ny = 180
 u_in = 0.04
-epsilon = 0.0001
+# epsilon = 0.0001
+epsilon = 0.1
 weights = [4/9,1/9,1/9,1/9,1/9,1/36,1/36,1/36,1/36]
 re = 1000
 vlb = u_in*(ny/2)/re
@@ -17,62 +18,109 @@ tau = 3*vlb+1/2
 ###
 ### INITIAL SETUP
 ###
-index_inverse = [0, 3, 4, 1, 2, 7, 8, 5, 6]
 
-wedge_border = np.fromfunction(lambda i, j: abs(j-nx/4)+abs(i) == ny/2,(ny,nx)).astype(int) + np.fromfunction(lambda i, j: i==0,(ny,nx)).astype(int) + np.fromfunction(lambda i, j: i==179,(ny,nx)).astype(int)
-wedge = np.fromfunction(lambda i, j: abs(j-nx/4)+abs(i) < ny/2,(ny,nx)).astype(int)
+wedge = np.fromfunction(lambda i, j: abs(j-nx/4)+abs(i) < ny/2,(ny,nx)).astype(int) + np.fromfunction(lambda i, j: i==0,(ny,nx)).astype(int) + np.fromfunction(lambda i, j: i==179,(ny,nx)).astype(int)
+wedge[wedge > 0] = 1
+wedge[0,0] = 0
+wedge[0,nx-1] = 0
+wedge[179,0] = 0
+wedge[179,nx-1] = 0
 
-directions = [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]]
-directions_reversed = [[0, 0], [-1, 0], [0, -1], [1, 0], [0, 1], [-1, -1], [1, -1], [1, 1], [-1, 1]]
+wedge_inside = np.fromfunction(lambda i, j: abs(j-nx/4)+abs(i-1) < ny/2,(ny,nx)).astype(int)
 
-particle_distribution = np.zeros((ny,nx,9))
-particle_distribution_eq = np.zeros((ny,nx,9))
 velocity = np.zeros((ny,nx,9))
 density = 1-wedge
+density = density.astype(float)
 
 velocity[:,:,1] = np.fromfunction(lambda i,j: u_in*(1+epsilon*np.sin((i*2*np.pi)/(ny-1))), (ny,nx))
-velocity_init = velocity[:,:,1]
+inlet_velocity = velocity
 
-particle_distribution_eq[:,:,1] = 1/9*density[:,:]*(1+3*velocity_init+6/2*velocity_init*velocity_init)
+def f_equilibrium(W, u, rho):
+    f_eq = np.zeros((ny,nx,9))
+    u_sq = np.linalg.norm(u, axis=2)
+    for i in range(9):
+        f_eq[:,:,i] = W[i]*rho*(1+3*u[:,:,i]+9/2*u[:,:,i]*u[:,:,i]-3/2*u_sq)
+    return f_eq
+
+particle_distribution_eq = f_equilibrium(weights, velocity, density)
+
+###
+### FUNCTIONS
+###
+
+directions = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+r_directions = [0, 3, 4, 1, 2, 7, 8, 5, 6]
+roll_directions = [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)]
+
+def in_density(f, in_v):
+    f_in = f[:,0,:]
+    in_v_in = in_v[:,0,:]
+    return (2*(f_in[:,3]+f_in[:,6]+f_in[:,7]) + f_in[:,0]+f_in[:,2]+f_in[:,4])/(1-np.sum(in_v_in,axis=1))
+
+def in_feq(W, in_v, rho_in):
+    in_v_in = in_v[:,0,:]
+    u_sq = np.linalg.norm(in_v_in, axis=1)
+    feq = np.zeros((180,9))
+    for i in range(9):
+        feq[:,i] = W[i]*rho_in*(1+3*in_v_in[:,i]+9/2*in_v_in[:,i]*in_v_in[:,i]-3/2*u_sq)
+    return feq
+
+def recalculate_density(f):
+    return np.sum(f,axis=2)
+
+def reverse_direction(a):
+    for i in directions:
+        a[:,:,i] = a[:,:,r_directions[i]]
+    return a
+
+def funct_on_subset(funct, obstacle, field):
+    return (1-obstacle)*field + obstacle*funct(field)
+
+def stream(field):
+    for i in range(9):
+        field[:,:,i] = np.roll(field[:,:,i],shift=roll_directions[i],axis=(0,1))
+    return field
+
+def setzero(a):
+    return np.zeros(np.shape(a))
+
+###
+### STEP
+###
+
 particle_distribution = particle_distribution_eq
 
-density = np.sum(particle_distribution,axis=2)
+for st in range(500):
 
-###
-### FIRST STEP
-###
+    density_in = in_density(particle_distribution, inlet_velocity)
 
-# wedge_3d = np.reshape(np.array([wedge]*9),(180,520,9))
-wedge_3d = np.repeat(wedge_border[:, :, np.newaxis], 9, axis=2)
+    f_in = in_feq(weights, inlet_velocity, density_in)
 
-particle_distribution_col = (particle_distribution - (particle_distribution - particle_distribution_eq)/tau)
+    for i in [1,5,8]:
+        particle_distribution[:,0,i] = f_in[:,i]
 
-particle_distribution_col_bound = particle_distribution_col[:,:,index_inverse]
+    for i in [3,6,7]:
+        particle_distribution[:,nx-1,i] = particle_distribution[:,nx-2,i]
 
-particle_distribution_col = particle_distribution_col*(1-wedge_3d) + particle_distribution_col_bound*wedge_3d
+    density = recalculate_density(particle_distribution)
+    particle_distribution_eq = f_equilibrium(weights, velocity, density)
 
-plt.matshow(particle_distribution_col[:,:,1]-particle_distribution_col[:,:,3])
-plt.show()
+    collision_distribution = particle_distribution - (particle_distribution-particle_distribution_eq)/tau
 
-### Streaming
+    collision_distribution = funct_on_subset(reverse_direction, np.repeat(wedge[:,:, np.newaxis], 9, axis=2), collision_distribution)
 
+    particle_distribution = stream(collision_distribution)
 
+    density = funct_on_subset(setzero,wedge_inside,density)
+    particle_distribution = funct_on_subset(setzero, np.repeat(wedge[:,:, np.newaxis], 9, axis=2), particle_distribution)
 
-#particle_distribution_col + wedge_border_3d*(  )
+    # for i in range(9):
+    #     velocity[:,:,i] = particle_distribution[:,:,i]/density
 
-# particle_distribution_eq[:,:,1] = 1/9*density[:,:]*(1+3*velocity_init+6/2*velocity_init*velocity_init)
-# particle_distribution = particle_distribution_eq
-# plt.matshow(particle_distribution_eq[:,:,1])
-# plt.show()
+    # plt.matshow(particle_distribution[:,:,1])
+    # plt.matshow(particle_distribution[:,:,6])
 
-# density = np.sum(particle_distribution,axis=2)
-# density[:,0] = (2*(particle_distribution[:,0,3]+particle_distribution[:,0,6]+particle_distribution[:,0,7])+particle_distribution[:,0,0]+particle_distribution[:,0,2]+particle_distribution[:,0,4])/(1-velocity_init[:,0])
-
-# ### Inlety / outlet
-
-
-# plt.matshow(density)
-# plt.show()
-
-
-# # density[:,0]=
+    if st % 30 == 0:
+        plt.matshow(np.linalg.norm(particle_distribution,axis=2))
+        plt.matshow(density)
+        plt.show()
