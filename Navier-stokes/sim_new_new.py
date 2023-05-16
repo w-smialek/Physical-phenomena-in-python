@@ -8,10 +8,10 @@ import imageio
 
 nx = 520
 ny = 180
-u_in = 0.07
+u_in = 0.073
 epsilon = 0.001
 weights = [4/9,1/9,1/9,1/9,1/9,1/36,1/36,1/36,1/36]
-re = 350
+re = 550
 vlb = u_in*(ny/2)/re
 tau = 3*vlb+1/2
 
@@ -29,12 +29,11 @@ def stream(field):
         field[:,:,i] = np.roll(field[:,:,i],shift=roll_directions[i],axis=(0,1))
     return field
 
-
 X, Y = np.meshgrid(range(nx),range(ny))
 
+f_inlet = np.zeros((ny,nx,9))
+f_inlet[:,:,1] = np.fromfunction(lambda i,j: u_in*(1+epsilon*np.sin((i*2*np.pi)/(ny-1))), (ny,nx))
 f_t = np.ones((ny,nx,9))
-f_t[:,:,1] +=  np.fromfunction(lambda i,j: u_in*(1+epsilon*np.sin((i*2*np.pi)/(ny-1))), (ny,nx))
-f_inlet = f_t
 f_eq = np.zeros(f_t.shape)
 
 density = np.ones((ny,nx))
@@ -96,7 +95,7 @@ for st in range(nt):
     
     if st % 50 == 0:
         # plt.matshow(np.linalg.norm(f_t,axis=2))
-        plt.imshow(np.linalg.norm(f_t,axis=2),cmap='hot')
+        plt.imshow(np.linalg.norm(f_t,axis=2)**2,cmap='hot')
         plt.savefig("plot"+str(st)+".png")
         print(st)
         # plt.show()
