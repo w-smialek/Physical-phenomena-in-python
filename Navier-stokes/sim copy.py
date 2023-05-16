@@ -56,6 +56,7 @@ velocity = np.zeros((ny,nx,9))
 density = np.ones((ny,nx))#1-wedge_inside
 density = density.astype(float)
 
+velocity[:,:,4] = u_in*np.fromfunction(lambda i, j: (abs(i-100)+abs(j-20))<10,(ny,nx)).astype(int)
 # velocity[:,:,1] = np.fromfunction(lambda i,j: u_in*(1+epsilon*np.sin(((j)*2*np.pi)/(ny-1))), (ny,nx))
 velocity[:,:,3] = u_in*np.fromfunction(lambda i, j: (abs(i-20)+abs(j-20))<10,(ny,nx)).astype(int)
 velocity[:,:,6] = u_in*np.fromfunction(lambda i, j: (abs(i-20)+abs(j-20))<10,(ny,nx)).astype(int)
