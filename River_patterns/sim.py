@@ -11,7 +11,7 @@ ny = 100
 beta = 0.05
 rr = 10
 del_h = 2
-tresh = 30
+tresh = 60
 
 X, Y = np.meshgrid(range(nx),range(ny))
 
@@ -70,14 +70,6 @@ def make_avalanche(h):
         where_avalanche_right[delta_h_right > rr] = 1
         where_avalanche = (where_avalanche_left + where_avalanche_right + where_avalanche_up + where_avalanche_down).astype(bool)
         where_avalanche[0,:] = np.zeros(100)
-        # plt.matshow(where_avalanche)
-        # plt.show()
-        # plt.close()
-
-    # plt.matshow(h)
-    # plt.matshow(delta_h_right)
-    # plt.show()
-    # plt.close()
 
     return h
 
@@ -85,7 +77,7 @@ all_river_paths = []
 
 udlr = [[-1,0],[1,0],[0,-1],[0,1]]
 
-for k in range(300):
+for k in range(1400):
     river_path = []
     random_coord = list(np.random.randint(1,ny-1,size=2))
     river_path.append(random_coord)
@@ -96,10 +88,9 @@ for k in range(300):
         new_coord = [a+b for a, b in zip(udlr[np.random.choice(4,p=current_probs)],river_path[-1])]
         river_path.append(new_coord)
     
-    if k%10 == 0:
-        elevation = make_avalanche(elevation)
-        print(k)
-        # make_avalanche(elevation)
+    # if k%10 == 0:
+    elevation = make_avalanche(elevation)
+    print(k)
 
     where_wet = np.zeros((nx,ny))
     for co in river_path:
@@ -110,15 +101,11 @@ for k in range(300):
     
     all_river_paths.append(river_path)
 
-# where_wet_all = np.zeros((nx,ny))
 
-# for riv in all_river_paths:
-#     where_wet = np.zeros((nx,ny))
-#     for co in riv:
-#         where_wet[co[0]%ny,co[1]%nx] += 1
-#     where_wet[where_wet>0] = 1
-#     where_wet_all += where_wet
-
+plt.imshow(np.flip(elevation,0),cmap='hot')
+plt.savefig("fig1.png")
+plt.show()
+plt.close()
 ###
 ### Check for rivers
 ###
@@ -153,7 +140,5 @@ where_wet_all[where_wet_all > tresh] = 1
 
 
 plt.matshow(np.flipud(where_wet_all))
-plt.show()
-
-plt.imshow(np.flip(elevation,0),cmap='hot')
+plt.savefig("fig2.png")
 plt.show()
